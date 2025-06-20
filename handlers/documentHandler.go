@@ -3,6 +3,7 @@ package handlers
 import (
 	"archive-system/databaseProvaider"
 	"archive-system/models"
+	"archive-system/repositories"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -10,7 +11,6 @@ import (
 
 func UploadDocumentWithMeta(c *gin.Context) {
 	author := c.PostForm("author")
-
 	if author == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Отсутствует автор документа"})
 		return
@@ -29,7 +29,7 @@ func UploadDocumentWithMeta(c *gin.Context) {
 	}
 	defer file.Close()
 
-	fileID, err := UploadPDFToGridFS(file, fileHeader.Filename)
+	fileID, err := repositories.UploadPDF(file, fileHeader.Filename)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка загрузки в GridFS"})
 		return
@@ -38,10 +38,10 @@ func UploadDocumentWithMeta(c *gin.Context) {
 	doc := models.Document{
 		Filename: fileHeader.Filename,
 		Author:   author,
-		MongoID:  []string{fileID.Hex()},
+		MongoIDs: []string{fileID.Hex()},
 	}
 
-	if err := databaseProvaider.DB.Create(&doc).Error; err != nil {
+	if err := repositories.CreateDocument(databaseProvaider.DB, &doc); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка сохранения в PostgreSQL"})
 		return
 	}
@@ -53,10 +53,9 @@ func UploadDocumentWithMeta(c *gin.Context) {
 	})
 }
 
-// вывод списка документов
 func ListDocuments(c *gin.Context) {
-	var docs []models.Document
-	if err := databaseProvaider.DB.Find(&docs).Error; err != nil {
+	docs, err := repositories.GetAllDocuments(databaseProvaider.DB)
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения документов"})
 		return
 	}
