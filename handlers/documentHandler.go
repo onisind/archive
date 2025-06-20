@@ -53,6 +53,69 @@ func UploadDocumentWithMeta(c *gin.Context) {
 	})
 }
 
+func UpdateDocument(c *gin.Context) {
+	id := c.Param("id")
+
+	doc, err := repositories.GetDocumentByID(databaseProvaider.DB, id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Документ не найден"})
+		return
+	}
+
+	if newAuthor := c.PostForm("author"); newAuthor != "" {
+		doc.Author = newAuthor
+	}
+
+	if newFilename := c.PostForm("filename"); newFilename != "" {
+		doc.Filename = newFilename
+	}
+
+	fileHeader, err := c.FormFile("pdf")
+	if err == nil {
+		file, err := fileHeader.Open()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка открытия файла"})
+			return
+		}
+		defer file.Close()
+
+		fileID, err := repositories.UploadPDF(file, fileHeader.Filename)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка загрузки файла в GridFS"})
+			return
+		}
+
+		doc.MongoIDs = append(doc.MongoIDs, fileID.Hex())
+	}
+
+	if err := repositories.UpdateDocument(databaseProvaider.DB, doc); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка обновления документа"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":  "Документ обновлён",
+		"document": doc,
+	})
+}
+
+func DeleteDocument(c *gin.Context) {
+	id := c.Param("id")
+
+	doc, err := repositories.GetDocumentByID(databaseProvaider.DB, id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Документ не найден"})
+		return
+	}
+
+	if err := repositories.DeleteDocument(databaseProvaider.DB, doc); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка удаления документа"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Документ удалён"})
+}
+
 func ListDocuments(c *gin.Context) {
 	docs, err := repositories.GetAllDocuments(databaseProvaider.DB)
 	if err != nil {

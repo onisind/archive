@@ -9,4 +9,6 @@ import (
 func SetupRoutes(r *gin.Engine) {
 	r.POST("/documents/upload", handlers.UploadDocumentWithMeta)
 	r.GET("/documents", handlers.ListDocuments)
+	r.PUT("/documents/update/:id", handlers.UpdateDocument)
+	r.DELETE("/documents/delete/:id", handlers.DeleteDocument)
 }
