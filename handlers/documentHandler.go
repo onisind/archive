@@ -5,6 +5,7 @@ import (
 	"archive-system/models"
 	"archive-system/repositories"
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 )
@@ -38,6 +39,7 @@ func UploadDocumentWithMeta(c *gin.Context) {
 	doc := models.Document{
 		Filename: fileHeader.Filename,
 		Author:   author,
+		Version:  1,
 		MongoIDs: []string{fileID.Hex()},
 	}
 
@@ -70,6 +72,15 @@ func UpdateDocument(c *gin.Context) {
 		doc.Filename = newFilename
 	}
 
+	if newVersion := c.PostForm("version"); newVersion != "" {
+		versionInt, err := strconv.Atoi(newVersion)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректное значение version"})
+			return
+		}
+		doc.Version = versionInt
+	}
+
 	fileHeader, err := c.FormFile("pdf")
 	if err == nil {
 		file, err := fileHeader.Open()
@@ -86,6 +97,7 @@ func UpdateDocument(c *gin.Context) {
 		}
 
 		doc.MongoIDs = append(doc.MongoIDs, fileID.Hex())
+		doc.Version = len(doc.MongoIDs)
 	}
 
 	if err := repositories.UpdateDocument(databaseProvaider.DB, doc); err != nil {
